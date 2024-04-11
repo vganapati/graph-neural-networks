@@ -53,7 +53,8 @@ import torch.nn.functional as F
 from torch.nn import Linear
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
-from torch_geometric.nn import GCNConv, global_add_pool
+from torch_geometric.nn import global_add_pool
+from equivariant_gcn import GCNConv
 
 # Create training set
 
@@ -87,7 +88,7 @@ node_attributes_4 = torch.tensor([[0, 0, 0],
                                   [1, 2, 0]], dtype=torch.float)
 num_classes = 5
 num_features = 3
-batch_size = 5
+batch_size = 1
 
 data_0 = Data(x=node_attributes_0, edge_index=edge_index, y=torch.tensor([0]))
 data_1 = Data(x=node_attributes_1, edge_index=edge_index, y=torch.tensor([1]))
@@ -157,7 +158,6 @@ class GCN(torch.nn.Module):
         self.lin = Linear(hidden_channels, num_classes)
     def forward(self, x, edge_index, batch, dropout_prob=0):
         # obtain node embeddings
-        breakpoint()
         x = self.conv1(x, edge_index)
         # readout layer
         x = global_add_pool(x, batch) # output shape is [batch_size, hidden_channels]
