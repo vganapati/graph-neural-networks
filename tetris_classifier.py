@@ -54,7 +54,7 @@ from torch.nn import Linear
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_add_pool
-from equivariant_gcn import GCNConv
+from equivariant_gcn import GCNConv, GraphEquivariantLayer
 
 # Create training set
 
@@ -114,7 +114,7 @@ def create_transform_mat():
 
     # perform x rotation first
     rot_x_mat = torch.tensor([[1, 0, 0],
-                            [1, torch.cos(theta_x), -torch.sin(theta_x)],
+                            [0, torch.cos(theta_x), -torch.sin(theta_x)],
                             [0, torch.sin(theta_x), torch.cos(theta_x)]])
 
     rot_z_mat = torch.tensor([[torch.cos(theta_z), -torch.sin(theta_z), 0],
@@ -133,23 +133,22 @@ def create_transform_mat():
 
 # Classification
 
-class GCN_equivariant(torch.nn.Module):
+class EquivariantGCN(torch.nn.Module):
     def __init__(self, hidden_channels):
-        super(GCN, self).__init__()
-        self.conv1 = GCNConv(num_features, hidden_channels)
+        super(EquivariantGCN, self).__init__()
+        self.conv1 = GraphEquivariantLayer(1, out_channels=1)
+        self.conv2 = GraphEquivariantLayer(1, out_channels=1)
         self.lin = Linear(hidden_channels, num_classes)
-    def conv_equivariant(self, x, edge_index):
-        pass
-        # reference: https://pytorch-geometric.readthedocs.io/en/latest/notes/create_gnn.html
     def forward(self, x, edge_index, batch, dropout_prob=0):
         # obtain node embeddings
-        x = self.conv1(x, edge_index)
+        x, features = self.conv1(x, edge_index)
+        x, features = self.conv2(x, edge_index)
         # readout layer
-        x = global_add_pool(x, batch) # output shape is [batch_size, hidden_channels]
+        features = global_add_pool(features, batch) # output shape is [batch_size, hidden_channels]
         # final classifier
-        x = F.dropout(x, p=dropout_prob, training=self.training)
-        x = self.lin(x)
-        return x
+        features = F.dropout(features, p=dropout_prob, training=self.training)
+        features = self.lin(features)
+        return features
 
 class GCN(torch.nn.Module):
     def __init__(self, hidden_channels):
@@ -166,7 +165,8 @@ class GCN(torch.nn.Module):
         x = self.lin(x)
         return x
 
-model = GCN(hidden_channels=3)
+# model = GCN(hidden_channels=3)
+model = EquivariantGCN(hidden_channels=1)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 criterion = torch.nn.CrossEntropyLoss()
 
@@ -196,7 +196,7 @@ def test(transform=True):
         correct += int((pred == data.y).sum())
     return correct / len(data_loader.dataset)
 
-num_epochs = 200
+num_epochs = 1000
 
 for epoch in range(num_epochs):
     total_loss = train()
@@ -204,4 +204,3 @@ for epoch in range(num_epochs):
     test_acc = test(transform=True)
     print(f'Epoch: {epoch:03d}, Loss: {total_loss:.4f}, Train Acc: {train_acc:.4f}, Test Acc: {test_acc:.4f}')
 
-# Tetris conversion

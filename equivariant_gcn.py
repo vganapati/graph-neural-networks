@@ -49,9 +49,39 @@ class GCNConv(MessagePassing):
         # Step 4: Normalize node features
         return norm.view(-1, 1) * x_j
 
-class GCNEquivariant(MessagePassing):
+class GraphEquivariantLayer(MessagePassing):
     def __init__(self, in_channels, out_channels):
         super().__init__(aggr='add')
         self.lin = Linear(in_channels, out_channels, bias=False)
         self.bias = Parameter(torch.empty(out_channels))
-        # XXX stopped here
+        
+        self.reset_parameters()
+    
+    def resest_parameters(self):
+        self.lin.reset_parameters()
+        self.bias.data.zero_()
+    
+    def forward(self, x, edge_index):
+        # x has shape [N, in_channels]
+        # edge_index has shape [2,e]
+
+        row, col = edge_index
+        
+        deg = degree(col, x.size(0), dtype = x.dtype)
+        deg_inv = deg.pow(-1)
+        deg_inv[deg_inv == float('inf')] = 0
+        norm = deg_inv
+        out = self.propagate(edge_index, x=x)
+        x_new = out[:,0:3]
+        features = out[:,3:]
+        x_new = norm.view(-1,1)*x_new
+        x_new = x + x_new
+        return x_new, features
+
+    def message(self, x_i, x_j):
+        edge_distances_sqr = torch.sum((x_i - x_j)**2, axis=1)
+        x_new = (self.lin(edge_distances_sqr[:,None])+self.bias)*(x_i - x_j)
+        features = (self.lin(edge_distances_sqr[:,None])+self.bias) #edge_distances_sqr[:,None] #(self.lin(edge_distances_sqr[:,None])+self.bias) #torch.sum(x_new**2, axis=1)[:,None]
+        out = torch.concatenate((x_new, features), axis=1)
+        # print(features)
+        return out
