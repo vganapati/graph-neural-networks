@@ -5,7 +5,7 @@ from e3nn import o3, nn
 from e3nn.math import soft_one_hot_linspace
 import matplotlib.pyplot as plt
 
-irreps_input = o3.Irreps("10x0e + 10x1e")
+irreps_input = o3.Irreps("20x0e + 10x1e") 
 irreps_output = o3.Irreps("10x0e + 10x1e")
 
 
@@ -44,5 +44,54 @@ edge_length_embedding = soft_one_hot_linspace(edge_vec.norm(dim=1), start=0.0, e
                                               basis='smooth_finite', cutoff=True)
 edge_length_embedding = edge_length_embedding.mul(num_basis**0.5)
 
+fc = nn.FullyConnectedNet([num_basis, 16, tp.weight_numel], torch.relu)
+weight = fc(edge_length_embedding)
 
-breakpoint()
+summand = tp(f_in[edge_src], sh, weight)
+f_out = scatter(summand, edge_dst, dim=0, dim_size=num_nodes)
+f_out = f_out.div(num_neighbors**0.5)
+
+
+def conv(f_in, pos):
+    edge_src, edge_dst = radius_graph(pos, max_radius, max_num_neighbors=len(pos) - 1)
+    edge_vec = pos[edge_dst] - pos[edge_src]
+    sh = o3.spherical_harmonics(irreps_sh, edge_vec, normalize=True, normalization='component')
+    emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, basis='smooth_finite', cutoff=True).mul(num_basis**0.5)
+    return scatter(tp(f_in[edge_src], sh, fc(emb)), edge_dst, dim=0, dim_size=num_nodes).div(num_neighbors**0.5)
+
+# check equivariance
+rot = o3.rand_matrix()
+D_in = irreps_input.D_from_matrix(rot)
+D_out = irreps_output.D_from_matrix(rot)
+
+# rotate before
+f_before = conv(f_in @ D_in.T, pos @ rot.T)
+
+# rotate after
+f_after = conv(f_in, pos) @ D_out.T
+
+assert torch.allclose(f_before, f_after, rtol=1e-4, atol=1e-4)
+
+# timing of the different elements
+
+import time
+wall = time.perf_counter()
+
+edge_src, edge_dst = radius_graph(pos, max_radius, max_num_neighbors=len(pos)-1)
+edge_vec = pos[edge_dst] - pos[edge_src]
+print(time.perf_counter() - wall); wall = time.perf_counter()
+
+sh = o3.spherical_harmonics(irreps_sh, edge_vec, normalize=True, normalization='component')
+print(time.perf_counter()-wall); wall = time.perf_counter()
+
+emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, basis='smooth_finite', cutoff=True).mul(num_basis**0.5)
+print(time.perf_counter()-wall); wall = time.perf_counter()
+
+weight = fc(emb)
+print(time.perf_counter()-wall); wall = time.perf_counter()
+
+summand = tp(f_in[edge_src], sh, weight)
+print(time.perf_counter()-wall); wall = time.perf_counter()
+
+scatter(summand, edge_dst, dim=0, dim_size=num_nodes).div(num_neighbors**0.5)
+print(time.perf_counter()-wall); wall = time.perf_counter()
