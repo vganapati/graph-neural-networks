@@ -1,3 +1,3 @@
 """
-reference: https://pytorch.org/tutorials/beginner/transformer_tutorial.html
+reference: https://nlp.seas.harvard.edu/annotated-transformer/
 """

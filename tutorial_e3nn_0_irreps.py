@@ -1,3 +1,6 @@
+"""
+https://docs.e3nn.org/en/latest/guide/irreps.html
+"""
 from e3nn import o3
 import torch
 import numpy as np

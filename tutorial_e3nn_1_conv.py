@@ -1,3 +1,6 @@
+"""
+https://docs.e3nn.org/en/latest/guide/convolution.html
+"""
 import torch
 from torch_cluster import radius_graph
 from torch_scatter import scatter
@@ -95,3 +98,5 @@ print(time.perf_counter()-wall); wall = time.perf_counter()
 
 scatter(summand, edge_dst, dim=0, dim_size=num_nodes).div(num_neighbors**0.5)
 print(time.perf_counter()-wall); wall = time.perf_counter()
+
+breakpoint()
