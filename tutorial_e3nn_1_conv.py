@@ -11,6 +11,9 @@ import matplotlib.pyplot as plt
 irreps_input = o3.Irreps("20x0e + 10x1e") 
 irreps_output = o3.Irreps("10x0e + 10x1e")
 
+# irreps_input = o3.Irreps("2x0e + 3x1o")
+# irreps_output = o3.Irreps("2x1o")
+parity = -1 # -1 for E(3) and +1 for SE(3), needs to be -1 to pass the inversion test
 
 # create node positions
 num_nodes = 100
@@ -28,7 +31,7 @@ print(num_neighbors)
 
 f_in = irreps_input.randn(num_nodes, -1)
 
-irreps_sh = o3.Irreps.spherical_harmonics(lmax=2, p=1)
+irreps_sh = o3.Irreps.spherical_harmonics(lmax=2, p=parity)
 sh = o3.spherical_harmonics(irreps_sh, edge_vec, normalize=True, normalization='component')
 
 tp = o3.FullyConnectedTensorProduct(irreps_input, irreps_sh, irreps_output, shared_weights=False)
@@ -62,16 +65,16 @@ def conv(f_in, pos):
     emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, basis='smooth_finite', cutoff=True).mul(num_basis**0.5)
     return scatter(tp(f_in[edge_src], sh, fc(emb)), edge_dst, dim=0, dim_size=num_nodes).div(num_neighbors**0.5)
 
-# check equivariance
-rot = o3.rand_matrix()
+# check equivariance, including inversion
+rot = o3.rand_matrix() @ torch.tensor([[-1.0, 0.0, 0.0],[0.0, -1.0, 0.0],[0.0, 0.0, -1.0]])
 D_in = irreps_input.D_from_matrix(rot)
 D_out = irreps_output.D_from_matrix(rot)
-
 # rotate before
 f_before = conv(f_in @ D_in.T, pos @ rot.T)
 
 # rotate after
 f_after = conv(f_in, pos) @ D_out.T
+
 
 assert torch.allclose(f_before, f_after, rtol=1e-4, atol=1e-4)
 
@@ -98,5 +101,3 @@ print(time.perf_counter()-wall); wall = time.perf_counter()
 
 scatter(summand, edge_dst, dim=0, dim_size=num_nodes).div(num_neighbors**0.5)
 print(time.perf_counter()-wall); wall = time.perf_counter()
-
-breakpoint()
