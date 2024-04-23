@@ -13,7 +13,7 @@ from e3nn.nn import FullyConnectedNet, Gate
 from e3nn.o3 import FullyConnectedTensorProduct
 from e3nn.math import soft_one_hot_linspace
 
-def tetris(rotate=True):
+def tetris(rotate=True, test_inversion=False):
     pos = [
         [(0,0,0),(0,0,1),(1,0,0),(1,1,0)], # chiral_shape_1
         [(0,0,0),(0,0,1),(1,0,0),(1,-1,0)], # chiral_shape_2
@@ -44,6 +44,8 @@ def tetris(rotate=True):
     if rotate:
         # apply random rotation
         rand_mat = o3.rand_matrix(len(pos))
+        if test_inversion:
+            rand_mat = -1*rand_mat
         pos = torch.einsum("zij,zaj->zai", rand_mat, pos)
         pos_labels = torch.einsum("zij,zaj->zai", rand_mat, pos)
     else:
@@ -74,10 +76,10 @@ class Convolution(torch.nn.Module):
         return node_features
 
 class UpdatePositionLayer(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, parity):
         super().__init__()
         self.num_neighbors = 3.8
-        self.irreps_sh = o3.Irreps.spherical_harmonics(3, p=1)
+        self.irreps_sh = o3.Irreps.spherical_harmonics(3, p=parity)
         irreps = self.irreps_sh
 
         # First layer with gate
@@ -90,7 +92,12 @@ class UpdatePositionLayer(torch.nn.Module):
         irreps = self.gate.irreps_out
 
         # Final layer
-        self.final = Convolution(irreps, self.irreps_sh, "1x1e", self.num_neighbors)
+        if parity == 1:
+            final_irreps = "1x1e"
+        else:
+            final_irreps = "1x1o"
+
+        self.final = Convolution(irreps, self.irreps_sh, final_irreps, self.num_neighbors)
         self.irreps_out = self.final.irreps_out
     
     def forward(self, data, position):
@@ -107,11 +114,11 @@ class UpdatePositionLayer(torch.nn.Module):
         return x
 
 class Network(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, parity):
         super().__init__()
-        self.layer_0 = UpdatePositionLayer()
-        self.layer_1 = UpdatePositionLayer()
-        self.layer_2 = UpdatePositionLayer()
+        self.layer_0 = UpdatePositionLayer(parity)
+        self.layer_1 = UpdatePositionLayer(parity)
+        self.layer_2 = UpdatePositionLayer(parity)
 
     def forward(self, data):
         position = data.pos
@@ -129,7 +136,12 @@ class Network(torch.nn.Module):
 
 def main():
     data, data_labels, _ = tetris(rotate=False)
-    f = Network()
+    parity = 1 # if parity == -1, cannot distinguish chiral shapes
+    if parity == -1:
+        test_inversion = True
+    else:
+        test_inversion = False
+    f = Network(parity)
 
     print("Build a model:")
     print(f)
@@ -150,7 +162,7 @@ def main():
     # Check equivariance
     print("Testing equivariance directly...")
     for batch in range(torch.max(data.batch)):
-        rotated_data, rotated_data_labels, rand_mat = tetris(rotate=True)
+        rotated_data, rotated_data_labels, rand_mat = tetris(rotate=True, test_inversion=test_inversion)
         pred_0 = (rand_mat[batch] @ (f(data)[data.batch == batch]).T).T
         pred_1 = f(rotated_data)[rotated_data.batch == batch]
         print(torch.max(torch.abs(pred_0-pred_1)))

@@ -1,3 +1,7 @@
+"""
+Reference: https://docs.e3nn.org/en/stable/guide/transformer.html
+"""
+
 import torch
 import e3nn
 from e3nn import o3
@@ -70,7 +74,9 @@ def transformer(f, pos, use_edge_weight_cutoff=True):
     edge_vec = pos[edge_src] - pos[edge_dst]
     edge_length = edge_vec.norm(dim=1)
 
-    edge_length_embedded = soft_one_hot_linspace(edge_length, start=0.0, end=max_radius, number=number_of_basis, basis='smooth_finite', cutoff=True)
+    edge_length_embedded = soft_one_hot_linspace(edge_length, start=0.0, end=max_radius, 
+                                                 number=number_of_basis, 
+                                                 basis='smooth_finite', cutoff=True)
     edge_length_embedded = edge_length_embedded.mul(number_of_basis**0.5)
     edge_weight_cutoff = soft_unit_step(10*(1 - edge_length/max_radius))
     edge_sh = o3.spherical_harmonics(irreps_sh, edge_vec, True, normalization='component')
