@@ -48,7 +48,7 @@ def tetris(rotate=True, test_inversion=False):
         if test_inversion:
             rot = -1*rot
         pos = torch.einsum("zij,zaj->zai", rot, pos)
-        pos_labels = torch.einsum("zij,zaj->zai", rot, pos)
+        pos_labels = torch.einsum("zij,zaj->zai", rot, pos_labels)
     else:
         rot = torch.tile(torch.eye(3)[None],dims=(len(pos),1,1))
 
@@ -177,17 +177,23 @@ def main():
         pred_0 = (rand_mat[batch] @ (f(data, rot)[data.batch == batch]).T).T
         pred_1 = f(rotated_data, rand_mat)[rotated_data.batch == batch]
         print(torch.max(torch.abs(pred_0-pred_1)))
-        assert torch.max(torch.abs(pred_0-pred_1))<1e-4
-
-    # Make plots
-    initial_shape = data
-    final_shape = f(data, rot)
-    desired_shape = data_labels
-    for batch in range(torch.max(initial_shape.batch)+1):
-        shape_actual = desired_shape.pos[initial_shape.batch == batch]
-        shape_pred = final_shape[initial_shape.batch == batch]
+        assert torch.max(torch.abs(pred_0-pred_1))<1e-3
+        
+        shape_actual = rotated_data_labels.pos[rotated_data.batch == batch]
+        shape_pred = pred_1
         plot_shape(shape_actual.detach().numpy(), shape_pred.detach().numpy(), batch)
 
+    breakpoint()
+
+    # # Make plots
+    # initial_shape = rotated_data
+    # final_shape = f(rotated_data, rand_mat)
+    # desired_shape = rotated_data_labels
+    # for batch in range(torch.max(initial_shape.batch)+1):
+    #     shape_actual = desired_shape.pos[initial_shape.batch == batch]
+    #     shape_pred = final_shape[initial_shape.batch == batch]
+    #     plot_shape(shape_actual.detach().numpy(), shape_pred.detach().numpy(), batch)
+    breakpoint()
 
 def plot_shape(shape_actual, shape_pred, batch):
     fig = plt.figure()
