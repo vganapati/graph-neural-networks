@@ -183,18 +183,6 @@ def main():
         shape_pred = pred_1
         plot_shape(shape_actual.detach().numpy(), shape_pred.detach().numpy(), batch)
 
-    breakpoint()
-
-    # # Make plots
-    # initial_shape = rotated_data
-    # final_shape = f(rotated_data, rand_mat)
-    # desired_shape = rotated_data_labels
-    # for batch in range(torch.max(initial_shape.batch)+1):
-    #     shape_actual = desired_shape.pos[initial_shape.batch == batch]
-    #     shape_pred = final_shape[initial_shape.batch == batch]
-    #     plot_shape(shape_actual.detach().numpy(), shape_pred.detach().numpy(), batch)
-    breakpoint()
-
 def plot_shape(shape_actual, shape_pred, batch):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
