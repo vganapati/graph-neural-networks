@@ -163,3 +163,4 @@ runs/*
 .DS_Store
 tmp/*
 *.png
+*/data/*
