@@ -97,5 +97,4 @@ for epoch in range(1, 201):
     loss = train()
     test_acc = test()
     print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}, Test Acc: {test_acc:.4f}')
-breakpoint()
 
